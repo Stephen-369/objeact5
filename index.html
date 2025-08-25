@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>勾股定理智能教学助手</title>
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+        }
+        /* 隐藏滚动条 */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        canvas {
+            border-radius: 1rem;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 100%;
+            height: auto;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+
+    <!-- 应用主容器 -->
+    <div class="bg-white rounded-3xl shadow-xl max-w-6xl w-full p-8 grid grid-cols-1 lg:grid-cols-[1.5fr_2fr] gap-8 border border-gray-200">
+
+        <!-- 左侧：AI教学与问答区 -->
+        <div class="flex flex-col h-full space-y-6">
+            <h1 class="text-3xl font-bold text-center text-indigo-700">勾股定理智能教学助手</h1>
+            
+            <!-- 模式切换按钮 -->
+            <div class="flex space-x-2">
+                <button id="mode-demo-btn" class="flex-1 p-3 rounded-xl bg-indigo-600 text-white font-semibold shadow-md transition-colors duration-200">动态演示</button>
+                <button id="mode-proof-btn" class="flex-1 p-3 rounded-xl bg-gray-200 text-gray-800 font-semibold shadow-md transition-colors duration-200">几何证明（割补法）</button>
+            </div>
+
+            <!-- 聊天窗口 -->
+            <div class="flex-1 bg-gray-50 rounded-2xl p-4 overflow-y-auto hide-scrollbar flex flex-col-reverse shadow-inner border border-gray-200" id="chat-history">
+                <!-- 消息将在此处动态添加 -->
+                <div class="text-sm text-gray-500 text-center py-2">
+                    你好！我是你的勾股定理AI助教。你可以问我任何关于勾股定理的问题哦！
+                </div>
+            </div>
+
+            <!-- 聊天输入框 -->
+            <div class="flex items-center space-x-3">
+                <input type="text" id="user-input" placeholder="输入你的问题..." class="flex-1 p-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                <button id="send-btn" class="bg-indigo-600 text-white p-3 rounded-xl hover:bg-indigo-700 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    发送
+                </button>
+            </div>
+        </div>
+
+        <!-- 右侧：动态探究区 -->
+        <div class="flex flex-col items-center h-full space-y-6">
+            <h2 class="text-2xl font-bold text-center text-gray-800" id="section-title">动态探究与演示</h2>
+
+            <!-- 绘制区域 -->
+            <div id="canvas-container" class="w-full flex justify-center items-center relative overflow-hidden rounded-xl">
+                <canvas id="pythagorean-canvas" class="w-full h-[450px]"></canvas>
+            </div>
+
+            <!-- 参数控制区域 -->
+            <div class="w-full space-y-4" id="control-panel">
+                <div class="flex flex-col items-start w-full">
+                    <label for="side-a-slider" class="text-sm font-medium text-gray-700 mb-1">直角边 a: <span id="side-a-value">3</span></label>
+                    <input type="range" id="side-a-slider" min="30" max="250" value="100" class="w-full h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div class="flex flex-col items-start w-full">
+                    <label for="side-b-slider" class="text-sm font-medium text-gray-700 mb-1">直角边 b: <span id="side-b-value">4</span></label>
+                    <input type="range" id="side-b-slider" min="30" max="250" value="150" class="w-full h-2 bg-indigo-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+            
+            <!-- 数据展示 -->
+            <div class="w-full bg-indigo-50 rounded-2xl p-6 shadow-inner border border-indigo-200 space-y-2" id="data-display">
+                <p class="text-lg font-medium text-gray-800">数据计算：</p>
+                <div class="flex justify-between items-center text-base font-semibold text-gray-700">
+                    <span>a² = <span id="a-squared-value">9</span></span>
+                    <span>b² = <span id="b-squared-value">16</span></span>
+                    <span>a² + b² = <span id="sum-value">25</span></span>
+                </div>
+                <div class="flex justify-between items-center text-base font-semibold text-gray-700 mt-2">
+                    <span>c = <span id="side-c-value">5</span></span>
+                    <span>c² = <span id="c-squared-value">25</span></span>
+                </div>
+                <p class="text-lg font-bold text-center mt-4" id="result-message"></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Define global variables and constants
+        const canvas = document.getElementById('pythagorean-canvas');
+        const ctx = canvas.getContext('2d');
+        const aSlider = document.getElementById('side-a-slider');
+        const bSlider = document.getElementById('side-b-slider');
+        const aValueSpan = document.getElementById('side-a-value');
+        const bValueSpan = document.getElementById('side-b-value');
+        const aSquaredSpan = document.getElementById('a-squared-value');
+        const bSquaredSpan = document.getElementById('b-squared-value');
+        const sumValueSpan = document.getElementById('sum-value');
+        const cValueSpan = document.getElementById('side-c-value');
+        const cSquaredSpan = document.getElementById('c-squared-value');
+        const resultMessage = document.getElementById('result-message');
+        const chatHistory = document.getElementById('chat-history');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const modeDemoBtn = document.getElementById('mode-demo-btn');
+        const modeProofBtn = document.getElementById('mode-proof-btn');
+        const sectionTitle = document.getElementById('section-title');
+        const controlPanel = document.getElementById('control-panel');
+        const dataDisplay = document.getElementById('data-display');
+        const canvasContainer = document.getElementById('canvas-container');
+        
+        let chatHistoryData = [];
+        let currentMode = 'dynamic_demo';
+        let proofPieces = [];
+        let isDragging = false;
+        let activePiece = null;
+        let dragOffsetX, dragOffsetY;
+
+        const padding = 20;
+        const scale = 1;
+        const colors = {
+            a: '#3B82F6', // 蓝色
+            b: '#F59E0B', // 橙色
+            c: '#EF4444', // 红色
+            triangle: '#60A5FA', // 三角形颜色
+            proof_square_c: '#EF4444', // c² 正方形
+            proof_triangle: '#9CA3AF' // 三角形灰色
+        };
+
+        // Resizes the canvas to fit its container and re-draws content
+        function resizeCanvas() {
+            const containerWidth = canvasContainer.clientWidth;
+            canvas.width = containerWidth;
+            canvas.height = containerWidth * 0.9;
+            draw();
+        }
+
+        // Main drawing function that calls the appropriate mode function
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (currentMode === 'dynamic_demo') {
+                drawDynamicDemo();
+            } else if (currentMode === 'geometric_proof') {
+                drawProof();
+            }
+        }
+
+        // Draws the interactive dynamic demo of a² + b² = c²
+        function drawDynamicDemo() {
+            let a = aSlider.value * scale;
+            let b = bSlider.value * scale;
+            let c = Math.sqrt(a * a + b * b);
+
+            aValueSpan.textContent = (a / 10).toFixed(1);
+            bValueSpan.textContent = (b / 10).toFixed(1);
+            cValueSpan.textContent = (c / 10).toFixed(1);
+            aSquaredSpan.textContent = (a * a / 100).toFixed(1);
+            bSquaredSpan.textContent = (b * b / 100).toFixed(1);
+            sumValueSpan.textContent = ((a * a + b * b) / 100).toFixed(1);
+            cSquaredSpan.textContent = (c * c / 100).toFixed(1);
+
+            if (Math.abs(a * a + b * b - c * c) < 0.1) {
+                resultMessage.innerHTML = `<span class="text-green-600">结果验证：a² + b² = c² 成立！</span>`;
+            } else {
+                resultMessage.innerHTML = `<span class="text-red-600">结果验证：a² + b² ≠ c²</span>`;
+            }
+
+            const startX = (canvas.width - Math.max(a, b) - c) / 2 + c;
+            const startY = (canvas.height - Math.max(a, b)) / 2 + Math.max(a, b);
+
+            ctx.fillStyle = colors.triangle;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(startX, startY - a);
+            ctx.lineTo(startX + b, startY);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = colors.a;
+            ctx.fillRect(startX - a, startY - a, a, a);
+            ctx.fillStyle = 'white';
+            ctx.font = '16px Inter';
+            ctx.fillText('a²', startX - a / 2 - 10, startY - a / 2);
+
+            ctx.fillStyle = colors.b;
+            ctx.fillRect(startX, startY, b, b);
+            ctx.fillStyle = 'white';
+            ctx.fillText('b²', startX + b / 2, startY + b / 2);
+
+            ctx.strokeStyle = colors.c;
+            ctx.lineWidth = 2;
+            const cSquareX = startX - a;
+            const cSquareY = startY - a;
+            ctx.strokeRect(cSquareX, cSquareY, a+b, a+b);
+        }
+
+        // Creates a Path2D object for a right triangle, used for hit detection
+        function createTrianglePath(width, height) {
+            const path = new Path2D();
+            path.moveTo(0, height);
+            path.lineTo(width, height);
+            path.lineTo(0, 0);
+            path.closePath();
+            return path;
+        }
+
+        // Draws the geometric proof (cut-and-paste)
+        function drawProof() {
+            const a = 120;
+            const b = 180;
+            const c = Math.sqrt(a * a + b * b);
+            const targetSize = a + b;
+            const targetX = (canvas.width - targetSize) / 2;
+            const targetY = (canvas.height - targetSize) / 2;
+
+            // Draw target area
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(targetX, targetY, targetSize, targetSize);
+            ctx.setLineDash([]);
+            ctx.font = '20px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#6B7280';
+            ctx.fillText('目标区域：(a+b)²', targetX + targetSize / 2, targetY - 10);
+            ctx.fillText(`a² + b² + 4 × 1/2ab = (a+b)²`, targetX + targetSize / 2, targetY + targetSize + 40);
+
+            // Initialize or update proof pieces if they don't exist
+            if (proofPieces.length === 0) {
+                // Central c² square
+                proofPieces.push({
+                    type: 'square_c',
+                    x: canvas.width / 4,
+                    y: canvas.height / 2 - c/2,
+                    width: c,
+                    height: c,
+                    rotation: 0,
+                    path: new Path2D(),
+                });
+                // Four right triangles
+                proofPieces.push({ type: 'triangle', x: 50, y: 10, width: a, height: b, rotation: 0, path: createTrianglePath(a, b) });
+                proofPieces.push({ type: 'triangle', x: 50 + b + 20, y: 10, width: a, height: b, rotation: 90, path: createTrianglePath(a, b) });
+                proofPieces.push({ type: 'triangle', x: 50 + b + 20, y: 10 + a + 20, width: a, height: b, rotation: 180, path: createTrianglePath(a, b) });
+                proofPieces.push({ type: 'triangle', x: 50, y: 10 + a + 20, width: a, height: b, rotation: 270, path: createTrianglePath(a, b) });
+            }
+
+            // Draw all pieces
+            proofPieces.forEach(piece => {
+                ctx.save();
+                ctx.translate(piece.x, piece.y);
+                ctx.rotate(piece.rotation * Math.PI / 180);
+
+                if (piece.type === 'square_c') {
+                    // Update path for square (needed for hit test)
+                    piece.path = new Path2D();
+                    piece.path.rect(0, 0, piece.width, piece.height);
+                    
+                    ctx.fillStyle = colors.proof_square_c;
+                    ctx.fillRect(0, 0, piece.width, piece.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = '20px Inter';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('c²', piece.width / 2, piece.height / 2);
+                } else if (piece.type === 'triangle') {
+                    ctx.fillStyle = colors.proof_triangle;
+                    ctx.fill(piece.path);
+                    ctx.stroke(piece.path);
+                }
+                ctx.restore();
+            });
+        }
+
+        // Mouse interaction logic for single-canvas dragging
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // Find the top-most piece at the clicked location
+            for (let i = proofPieces.length - 1; i >= 0; i--) {
+                const piece = proofPieces[i];
+
+                ctx.save();
+                ctx.translate(piece.x, piece.y);
+                ctx.rotate(piece.rotation * Math.PI / 180);
+
+                if (ctx.isPointInPath(piece.path, mouseX, mouseY)) {
+                    isDragging = true;
+                    activePiece = piece;
+                    // Calculate drag offset relative to the piece's untransformed origin
+                    dragOffsetX = mouseX - piece.x;
+                    dragOffsetY = mouseY - piece.y;
+
+                    // Move the active piece to the top of the draw order
+                    proofPieces.splice(i, 1);
+                    proofPieces.push(activePiece);
+                    
+                    ctx.restore();
+                    break;
+                }
+                ctx.restore();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging && activePiece) {
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // Update piece position based on drag offset
+                let newX = mouseX - dragOffsetX;
+                let newY = mouseY - dragOffsetY;
+
+                // 移除不必要的边界检查，让用户可以自由移动图形
+                // if (newX < 0) newX = 0;
+                // if (newY < 0) newY = 0;
+                // if (newX > canvas.width - activePiece.width) newX = canvas.width - activePiece.width;
+                // if (newY > canvas.height - activePiece.height) newY = canvas.height - activePiece.height;
+
+                activePiece.x = newX;
+                activePiece.y = newY;
+
+                draw(); // Redraw the entire canvas
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            activePiece = null;
+        });
+
+        // Chat functionality
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message === '') return;
+
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'flex justify-end mb-2';
+            userMessageDiv.innerHTML = `<div class="bg-indigo-500 text-white rounded-lg p-3 max-w-xs break-words shadow-md">
+                ${message}
+            </div>`;
+            chatHistory.appendChild(userMessageDiv);
+            userInput.value = '';
+
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'loading-message';
+            loadingDiv.className = 'flex justify-start mb-2';
+            loadingDiv.innerHTML = `<div class="bg-gray-200 text-gray-700 rounded-lg p-3 max-w-xs break-words shadow-md animate-pulse">
+                AI助教思考中...
+            </div>`;
+            chatHistory.appendChild(loadingDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+
+            chatHistoryData.push({ role: 'user', parts: [{ text: message }] });
+
+            const prompt = `你是一名专业的数学老师，正在辅导一个学习勾股定理的学生。请用简明、易懂的语言回答学生的问题。请避免无关的闲聊，专注于数学知识。学生的问题是：${message}`;
+            const payload = {
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            };
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const callApiWithBackoff = async (attempt = 0) => {
+                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                    if (response.status === 429 && attempt < 5) {
+                        console.log(`Rate limit exceeded, retrying in ${delay / 1000}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return callApiWithBackoff(attempt + 1);
+                    }
+                    if (!response.ok) {
+                        throw new Error(`API response error: ${response.statusText}`);
+                    }
+                    return response.json();
+                } catch (error) {
+                    console.error('API call failed:', error);
+                    if (attempt < 5) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        return callApiWithBackoff(attempt + 1);
+                    }
+                    return null;
+                }
+            };
+
+            const result = await callApiWithBackoff();
+
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+
+            if (result && result.candidates && result.candidates.length > 0) {
+                const aiMessage = result.candidates[0].content.parts[0].text;
+                const aiMessageDiv = document.createElement('div');
+                aiMessageDiv.className = 'flex justify-start mb-2';
+                aiMessageDiv.innerHTML = `<div class="bg-gray-200 text-gray-800 rounded-lg p-3 max-w-xs break-words shadow-md">
+                    ${aiMessage}
+                </div>`;
+                chatHistory.appendChild(aiMessageDiv);
+            } else {
+                const errorMessageDiv = document.createElement('div');
+                errorMessageDiv.className = 'flex justify-start mb-2';
+                errorMessageDiv.innerHTML = `<div class="bg-red-200 text-red-800 rounded-lg p-3 max-w-xs break-words shadow-md">
+                    抱歉，AI助教暂时无法回答您的问题，请稍后再试。
+                </div>`;
+                chatHistory.appendChild(errorMessageDiv);
+            }
+
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        // Event listeners for sliders and buttons
+        aSlider.addEventListener('input', draw);
+        bSlider.addEventListener('input', draw);
+        window.addEventListener('resize', resizeCanvas);
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Mode switching logic
+        modeDemoBtn.addEventListener('click', () => {
+            currentMode = 'dynamic_demo';
+            modeDemoBtn.classList.add('bg-indigo-600', 'text-white');
+            modeDemoBtn.classList.remove('bg-gray-200', 'text-gray-800');
+            modeProofBtn.classList.add('bg-gray-200', 'text-gray-800');
+            modeProofBtn.classList.remove('bg-indigo-600', 'text-white');
+            sectionTitle.textContent = '动态探究与演示';
+            controlPanel.style.display = 'block';
+            dataDisplay.style.display = 'block';
+            draw();
+        });
+
+        modeProofBtn.addEventListener('click', () => {
+            currentMode = 'geometric_proof';
+            modeProofBtn.classList.add('bg-indigo-600', 'text-white');
+            modeProofBtn.classList.remove('bg-gray-200', 'text-gray-800');
+            modeDemoBtn.classList.add('bg-gray-200', 'text-gray-800');
+            modeDemoBtn.classList.remove('bg-indigo-600', 'text-white');
+            sectionTitle.textContent = '几何证明（割补法）';
+            controlPanel.style.display = 'none';
+            dataDisplay.style.display = 'none';
+            proofPieces = []; // Reset pieces
+            draw();
+        });
+
+        // Initialize on page load
+        window.onload = function() {
+            resizeCanvas();
+            draw();
+        };
+
+    </script>
+</body>
+</html>
